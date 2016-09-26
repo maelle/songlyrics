@@ -1,0 +1,82 @@
+---
+title: "Song lyrics across the world"
+author: "M. Salmon"
+date: "September 26, 2016"
+output:
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE, 
+                      warning = FALSE)
+```
+
+# Introduction
+
+Julia Silge wrote a nice blog post ["Song Lyrics Across the United States"](http://juliasilge.com/blog/Song-Lyrics-Across/) where she counted the number of songs mentioning each State in Kaylin Walker's [dataset](http://kaylinwalker.com/50-years-of-pop-music/). After reading the post I decided to try a different approach to find location names in the lyrics, using automatic geoparsing instead of matching against a pre-defined list of locations. I recently created a R package for geoparsing, called [geoparser](https://github.com/ropenscilabs/geoparser/), which is an interface to [geoparser API](https://geoparser.io/). 
+
+# Geoparsing
+
+After reading the big dataset of songs lyrics I changed its encoding for not getting any special characters because I got an error from geoparser API because of that, and then I sent each song text to the API. Printing the song title wasn't necessary but I liked seeing progress whereever I checked on the analysis.
+
+```{r, eval = FALSE}
+library("dplyr")
+library("readr")
+library("purrr")
+library("geoparser")
+song_lyrics <- read_csv("data/billboard_lyrics_1964-2015.csv")
+
+Encoding(song_lyrics$Lyrics) <- "latin1"  # (just to make sure)
+song_lyrics$Lyrics <- iconv(song_lyrics$Lyrics, "latin1", "ASCII", sub="")
+
+song_lyrics <- song_lyrics %>%
+  filter(!is.na(Lyrics)) %>%
+  by_row(function(x){
+  print(x$Song)
+  lala <- geoparser_q(x$Lyrics)
+  lala$results
+})
+
+save(song_lyrics, file = "output/song_lyrics.RData")
+
+```
+
+# Mapping 
+
+I then used tidyr to unnest the list column containing the geoparsing results, and then mapped them. If you click on a circle you'll see the name and type of the place (is it a populated place, or an administrative division, e.g. San Francisco vs. California) and the number and titles of the songs where the location was identified.
+
+```{r}
+library("dplyr")
+library("leaflet")
+library("tidyr")
+load("output/song_lyrics.RData")
+
+unnested_lyrics <- unnest(song_lyrics, .out)
+
+
+unnested_lyrics %>%
+  group_by(name, longitude, latitude, type) %>%
+  summarize(n = length(unique(Song)), song = toString(unique(Song))) %>%
+  group_by(name) %>%
+  mutate(popup = paste(name, type, paste0(n, " songs which are ", song), sep = ",")) %>%
+  ungroup() %>%
+  filter(! type %in% c("continent")) %>%
+  leaflet() %>%
+  addTiles %>%
+  addCircleMarkers(lng = ~longitude,
+                   lat = ~latitude,
+                   popup = ~popup)
+
+
+
+```
+
+Look at null island (longitude and latitude 0) which is actually the location given for the moon by geoparser!
+
+# Conclusion
+
+When comparing lyrics against geoparsing results, one will surely find some inadequacies, but it was fun anyway. Keep in mind that geoparsing was not developped for geoparsing songs.
+
+I have a feeling such an analysis could become a nice Shiny app or interactive dashboard where one could see the lyrics corresponding to any song more easily with clicks on the map but I don't have time for that.

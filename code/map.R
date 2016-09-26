@@ -2,7 +2,7 @@ library("dplyr")
 library("leaflet")
 library("tidyr")
 library("htmlwidgets")
-load("song_lyrics.RData")
+load("output/song_lyrics.RData")
 
 unnested_lyrics <- unnest(song_lyrics, .out)
 m <- unnested_lyrics %>%
