@@ -2,7 +2,6 @@ library("dplyr")
 library("readr")
 library("purrr")
 library("geoparser")
-library("monkeylearn")
 library("tidyr")
 song_lyrics <- read_csv("./billboard_lyrics_1964-2015.csv")
 
